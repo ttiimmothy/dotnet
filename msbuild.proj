@@ -1,0 +1,12 @@
+<Project>
+
+  <ItemGroup>
+    <MyItems Include=";" />
+  </ItemGroup>
+
+  <Target Name="Test">
+    <Message Importance="high" Text="MyItems: @(MyItems)" />
+    <Message Importance="high" Text="MyItems: [%(MyItems.Identity)]" />
+  </Target>
+
+</Project>
