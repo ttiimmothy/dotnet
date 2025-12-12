@@ -4,3 +4,21 @@
 // Changes to this file must follow the https://aka.ms/api-review process.
 // ------------------------------------------------------------------------------
 
+namespace System.IO.StreamExtensions
+{
+    public sealed partial class StringStream : System.IO.Stream
+    {
+        public StringStream(string source) { }
+        public StringStream(string source, System.Text.Encoding encoding, int bufferSize = 4096) { }
+        public override bool CanRead { get { throw null; } }
+        public override bool CanSeek { get { throw null; } }
+        public override bool CanWrite { get { throw null; } }
+        public override long Length { get { throw null; } }
+        public override long Position { get { throw null; } set { } }
+        public override void Flush() { }
+        public override int Read(byte[] user_buffer, int offset, int count) { throw null; }
+        public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
+        public override void SetLength(long value) { }
+        public override void Write(byte[] buffer, int offset, int count) { }
+    }
+}

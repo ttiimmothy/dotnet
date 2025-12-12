@@ -4,7 +4,10 @@ using System.Text;
 
 namespace System.IO.StreamExtensions;
 
-internal sealed class StringStream : Stream
+/// <summary>
+/// Provides a read-only, non-seekable stream that encodes a string into bytes on-the-fly.
+/// </summary>
+public sealed class StringStream : Stream
 {
     private readonly string _source;
     private readonly Encoder _encoder;
@@ -13,12 +16,23 @@ internal sealed class StringStream : Stream
     private int _byteBufferCount;
     private int _byteBufferPosition;
 
-
-    internal StringStream(string source) // Default UTF8 encoding
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StringStream"/> class with the specified source string using UTF-8 encoding.
+    /// </summary>
+    /// <param name="source">The string to read from.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
+    public StringStream(string source) // Default UTF8 encoding
         : this(source, Encoding.UTF8)
     {
     }
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="StringStream"/> class with the specified source string and encoding.
+    /// </summary>
+    /// <param name="source">The string to read from.</param>
+    /// <param name="encoding">The encoding to use when converting the string to bytes.</param>
+    /// <param name="bufferSize">The size of the internal buffer used for encoding. Default is 4096 bytes.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="source"/> is <see langword="null"/>.</exception>
     public StringStream(string source, Encoding encoding, int bufferSize = 4096)
     {
         _source = source ?? throw new ArgumentNullException(nameof(source));
@@ -26,14 +40,19 @@ internal sealed class StringStream : Stream
         _byteBuffer = new byte[bufferSize];
     }
 
+    /// <inheritdoc/>
     public override bool CanRead => true;
 
+    /// <inheritdoc/>
     public override bool CanSeek => false;
 
+    /// <inheritdoc/>
     public override bool CanWrite => false;
 
+    /// <inheritdoc/>
     public override long Length => throw new NotSupportedException();
 
+    /// <inheritdoc/>
     public override long Position
     {
         get => throw new NotSupportedException();
@@ -42,6 +61,7 @@ internal sealed class StringStream : Stream
 
     // Read method encodes chunks of the underlying string into the provided buffer "on-the-fly"
     // with a 4KB window (_byteBuffer) for encoding
+    /// <inheritdoc/>
     public override int Read(byte[] user_buffer, int offset, int count)
     {
         int totalBytesRead = 0;
@@ -78,13 +98,15 @@ internal sealed class StringStream : Stream
         return totalBytesRead;
     }
 
+    /// <inheritdoc/>
     public override void Flush() { }
-
     // Seek not supported - read-only stream. Data is read sequentially.
+    /// <inheritdoc/>
     public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
 
+    /// <inheritdoc/>
     public override void SetLength(long value) => throw new NotSupportedException();
-
     // Not supported for String or ReadOnlyMemory scenarios
+    /// <inheritdoc/>
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }
