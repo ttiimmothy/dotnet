@@ -1671,8 +1671,9 @@ namespace System.Text.Json.SourceGeneration
             /// <summary>
             /// Constructs a closed generic type from an unbound generic type (potentially nested),
             /// using the provided type arguments in the order they should be applied.
+            /// Returns null if the type cannot be constructed.
             /// </summary>
-            private static INamedTypeSymbol ConstructNestedGenericType(INamedTypeSymbol unboundType, ImmutableArray<ITypeSymbol> typeArguments)
+            private static INamedTypeSymbol? ConstructNestedGenericType(INamedTypeSymbol unboundType, ImmutableArray<ITypeSymbol> typeArguments)
             {
                 // Build the chain of containing types from outermost to innermost
                 var typeChain = new List<INamedTypeSymbol>();
@@ -1716,7 +1717,7 @@ namespace System.Text.Json.SourceGeneration
                             }
                             else
                             {
-                                return null!;
+                                return null;
                             }
                         }
                     }
@@ -1735,7 +1736,7 @@ namespace System.Text.Json.SourceGeneration
                     }
                 }
 
-                return constructedContainingType!;
+                return constructedContainingType;
             }
 
             private static string DetermineEffectiveJsonPropertyName(string propertyName, string? jsonPropertyName, SourceGenerationOptionsSpec? options)
