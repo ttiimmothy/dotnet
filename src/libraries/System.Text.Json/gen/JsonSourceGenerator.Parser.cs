@@ -1155,6 +1155,7 @@ namespace System.Text.Json.SourceGeneration
                 ProcessMemberCustomAttributes(
                     contextType,
                     memberInfo,
+                    memberType,
                     out bool hasJsonInclude,
                     out string? jsonPropertyName,
                     out JsonIgnoreCondition? ignoreCondition,
@@ -1260,6 +1261,7 @@ namespace System.Text.Json.SourceGeneration
             private void ProcessMemberCustomAttributes(
                 INamedTypeSymbol contextType,
                 ISymbol memberInfo,
+                ITypeSymbol memberType,
                 out bool hasJsonInclude,
                 out string? jsonPropertyName,
                 out JsonIgnoreCondition? ignoreCondition,
@@ -1293,7 +1295,7 @@ namespace System.Text.Json.SourceGeneration
 
                     if (converterType is null && _knownSymbols.JsonConverterAttributeType.IsAssignableFrom(attributeType))
                     {
-                        converterType = GetConverterTypeFromJsonConverterAttribute(contextType, memberInfo, attributeData);
+                        converterType = GetConverterTypeFromJsonConverterAttribute(contextType, memberInfo, attributeData, memberType);
                     }
                     else if (attributeType.ContainingAssembly.Name == SystemTextJsonNamespace)
                     {
@@ -1595,7 +1597,7 @@ namespace System.Text.Json.SourceGeneration
                 return propertyInitializers;
             }
 
-            private TypeRef? GetConverterTypeFromJsonConverterAttribute(INamedTypeSymbol contextType, ISymbol declaringSymbol, AttributeData attributeData)
+            private TypeRef? GetConverterTypeFromJsonConverterAttribute(INamedTypeSymbol contextType, ISymbol declaringSymbol, AttributeData attributeData, ITypeSymbol? typeToConvert = null)
             {
                 Debug.Assert(_knownSymbols.JsonConverterAttributeType.IsAssignableFrom(attributeData.AttributeClass));
 
@@ -1607,25 +1609,47 @@ namespace System.Text.Json.SourceGeneration
 
                 Debug.Assert(attributeData.ConstructorArguments.Length == 1 && attributeData.ConstructorArguments[0].Value is null or ITypeSymbol);
                 var converterType = (ITypeSymbol?)attributeData.ConstructorArguments[0].Value;
-                return GetConverterTypeFromAttribute(contextType, converterType, declaringSymbol, attributeData);
+
+                // If typeToConvert is not provided, try to infer it from declaringSymbol
+                typeToConvert ??= declaringSymbol as ITypeSymbol;
+
+                return GetConverterTypeFromAttribute(contextType, converterType, declaringSymbol, attributeData, typeToConvert);
             }
 
-            private TypeRef? GetConverterTypeFromAttribute(INamedTypeSymbol contextType, ITypeSymbol? converterType, ISymbol declaringSymbol, AttributeData attributeData)
+            private TypeRef? GetConverterTypeFromAttribute(INamedTypeSymbol contextType, ITypeSymbol? converterType, ISymbol declaringSymbol, AttributeData attributeData, ITypeSymbol? typeToConvert = null)
             {
                 if (converterType is not INamedTypeSymbol namedConverterType ||
                     !_knownSymbols.JsonConverterType.IsAssignableFrom(namedConverterType) ||
                     !namedConverterType.Constructors.Any(c => c.Parameters.Length == 0 && IsSymbolAccessibleWithin(c, within: contextType)))
                 {
-                    ReportDiagnostic(DiagnosticDescriptors.JsonConverterAttributeInvalidType, attributeData.GetLocation(), converterType?.ToDisplayString() ?? "null", declaringSymbol.ToDisplayString());
-                    return null;
+                    // Check if this is an unbound generic converter type that can be constructed
+                    if (converterType is INamedTypeSymbol { IsUnboundGenericType: true } unboundConverterType &&
+                        _knownSymbols.JsonConverterType.IsAssignableFrom(unboundConverterType) &&
+                        typeToConvert is INamedTypeSymbol { IsGenericType: true } genericTypeToConvert &&
+                        unboundConverterType.TypeParameters.Length == genericTypeToConvert.TypeArguments.Length)
+                    {
+                        // Construct the closed generic converter type
+                        namedConverterType = unboundConverterType.Construct(genericTypeToConvert.TypeArguments.ToArray());
+
+                        if (!namedConverterType.Constructors.Any(c => c.Parameters.Length == 0 && IsSymbolAccessibleWithin(c, within: contextType)))
+                        {
+                            ReportDiagnostic(DiagnosticDescriptors.JsonConverterAttributeInvalidType, attributeData.GetLocation(), converterType?.ToDisplayString() ?? "null", declaringSymbol.ToDisplayString());
+                            return null;
+                        }
+                    }
+                    else
+                    {
+                        ReportDiagnostic(DiagnosticDescriptors.JsonConverterAttributeInvalidType, attributeData.GetLocation(), converterType?.ToDisplayString() ?? "null", declaringSymbol.ToDisplayString());
+                        return null;
+                    }
                 }
 
-                if (_knownSymbols.JsonStringEnumConverterType.IsAssignableFrom(converterType))
+                if (_knownSymbols.JsonStringEnumConverterType.IsAssignableFrom(namedConverterType))
                 {
                     ReportDiagnostic(DiagnosticDescriptors.JsonStringEnumConverterNotSupportedInAot, attributeData.GetLocation(), declaringSymbol.ToDisplayString());
                 }
 
-                return new TypeRef(converterType);
+                return new TypeRef(namedConverterType);
             }
 
             private static string DetermineEffectiveJsonPropertyName(string propertyName, string? jsonPropertyName, SourceGenerationOptionsSpec? options)
