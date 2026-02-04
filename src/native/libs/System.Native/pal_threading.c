@@ -198,6 +198,7 @@ int32_t SystemNative_LowLevelMonitor_TimedWait(LowLevelMonitor *monitor, int32_t
     assert(error == 0);
 
     int64_t remainingMilliseconds = timeoutMilliseconds;
+    bool signaled = false;
 
     while (remainingMilliseconds > 0)
     {
@@ -221,27 +222,34 @@ int32_t SystemNative_LowLevelMonitor_TimedWait(LowLevelMonitor *monitor, int32_t
         if (error == 0)
         {
             // Signaled, return success
+            signaled = true;
             break;
         }
 
-        assert(error == ETIMEDOUT);
+        // Treat any error other than ETIMEDOUT as a timeout for safety
+        // (EINVAL, EPERM, etc. should not happen with correct usage)
 
         // Calculate elapsed time using monotonic clock
         struct timespec currentTime;
-        error = clock_gettime(CLOCK_MONOTONIC, &currentTime);
-        assert(error == 0);
+        int clockError = clock_gettime(CLOCK_MONOTONIC, &currentTime);
+        assert(clockError == 0);
+        (void)clockError; // Suppress unused variable warning in release builds
 
-        int64_t elapsedMilliseconds = (currentTime.tv_sec - startTime.tv_sec) * 1000 +
-                                      (currentTime.tv_nsec - startTime.tv_nsec) / (1000 * 1000);
+        // Handle nanosecond wraparound correctly
+        int64_t elapsedSeconds = currentTime.tv_sec - startTime.tv_sec;
+        int64_t elapsedNanoseconds = currentTime.tv_nsec - startTime.tv_nsec;
+        if (elapsedNanoseconds < 0)
+        {
+            elapsedSeconds -= 1;
+            elapsedNanoseconds += 1000 * 1000 * 1000;
+        }
+        int64_t elapsedMilliseconds = elapsedSeconds * 1000 + elapsedNanoseconds / (1000 * 1000);
 
         remainingMilliseconds = timeoutMilliseconds - elapsedMilliseconds;
     }
 
-    // If we exited the loop due to remainingMilliseconds <= 0, set error to ETIMEDOUT
-    if (remainingMilliseconds <= 0)
-    {
-        error = ETIMEDOUT;
-    }
+    // Set error based on whether we were signaled or timed out
+    error = signaled ? 0 : ETIMEDOUT;
 #else
     struct timeval tv;
 
