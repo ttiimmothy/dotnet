@@ -226,7 +226,7 @@ int32_t SystemNative_LowLevelMonitor_TimedWait(LowLevelMonitor *monitor, int32_t
             break;
         }
 
-        // Treat any error other than ETIMEDOUT as a timeout for safety
+        // Treat any error other than 0 (signaled) as a reason to continue checking
         // (EINVAL, EPERM, etc. should not happen with correct usage)
 
         // Calculate elapsed time using monotonic clock
