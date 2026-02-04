@@ -179,6 +179,69 @@ int32_t SystemNative_LowLevelMonitor_TimedWait(LowLevelMonitor *monitor, int32_t
 #if HAVE_PTHREAD_CONDATTR_SETCLOCK && HAVE_CLOCK_MONOTONIC
     error = clock_gettime(CLOCK_MONOTONIC, &timeoutTimeSpec);
     assert(error == 0);
+
+    uint64_t nanoseconds = (uint64_t)timeoutMilliseconds * 1000 * 1000 + (uint64_t)timeoutTimeSpec.tv_nsec;
+    timeoutTimeSpec.tv_sec += nanoseconds / (1000 * 1000 * 1000);
+    timeoutTimeSpec.tv_nsec = nanoseconds % (1000 * 1000 * 1000);
+
+    error = pthread_cond_timedwait(&monitor->Condition, &monitor->Mutex, &timeoutTimeSpec);
+#elif HAVE_CLOCK_MONOTONIC
+    // The condition variable was not configured to use CLOCK_MONOTONIC (no pthread_condattr_setclock),
+    // so pthread_cond_timedwait uses CLOCK_REALTIME by default. CLOCK_REALTIME is affected by system
+    // time changes (e.g., NTP adjustments, manual time changes), which can cause waits to hang or
+    // return prematurely. To work around this, we use a loop that:
+    // 1. Tracks elapsed time using CLOCK_MONOTONIC (not affected by system time changes)
+    // 2. Performs the actual wait using CLOCK_REALTIME with short intervals
+    // 3. Rechecks the monotonic elapsed time after each wait to determine if the timeout has truly expired
+    struct timespec startTime;
+    error = clock_gettime(CLOCK_MONOTONIC, &startTime);
+    assert(error == 0);
+
+    int64_t remainingMilliseconds = timeoutMilliseconds;
+
+    while (remainingMilliseconds > 0)
+    {
+        // Use a maximum wait interval of 100ms to limit exposure to clock adjustments
+        // while not spinning too frequently for short waits
+        int64_t waitMilliseconds = remainingMilliseconds < 100 ? remainingMilliseconds : 100;
+
+        struct timeval tv;
+        error = gettimeofday(&tv, NULL);
+        assert(error == 0);
+
+        timeoutTimeSpec.tv_sec = tv.tv_sec;
+        timeoutTimeSpec.tv_nsec = tv.tv_usec * 1000;
+
+        uint64_t nanoseconds = (uint64_t)waitMilliseconds * 1000 * 1000 + (uint64_t)timeoutTimeSpec.tv_nsec;
+        timeoutTimeSpec.tv_sec += nanoseconds / (1000 * 1000 * 1000);
+        timeoutTimeSpec.tv_nsec = nanoseconds % (1000 * 1000 * 1000);
+
+        error = pthread_cond_timedwait(&monitor->Condition, &monitor->Mutex, &timeoutTimeSpec);
+
+        if (error == 0)
+        {
+            // Signaled, return success
+            break;
+        }
+
+        assert(error == ETIMEDOUT);
+
+        // Calculate elapsed time using monotonic clock
+        struct timespec currentTime;
+        error = clock_gettime(CLOCK_MONOTONIC, &currentTime);
+        assert(error == 0);
+
+        int64_t elapsedMilliseconds = (currentTime.tv_sec - startTime.tv_sec) * 1000 +
+                                      (currentTime.tv_nsec - startTime.tv_nsec) / (1000 * 1000);
+
+        remainingMilliseconds = timeoutMilliseconds - elapsedMilliseconds;
+    }
+
+    // If we exited the loop due to remainingMilliseconds <= 0, set error to ETIMEDOUT
+    if (remainingMilliseconds <= 0)
+    {
+        error = ETIMEDOUT;
+    }
 #else
     struct timeval tv;
 
@@ -187,12 +250,13 @@ int32_t SystemNative_LowLevelMonitor_TimedWait(LowLevelMonitor *monitor, int32_t
 
     timeoutTimeSpec.tv_sec = tv.tv_sec;
     timeoutTimeSpec.tv_nsec = tv.tv_usec * 1000;
-#endif
+
     uint64_t nanoseconds = (uint64_t)timeoutMilliseconds * 1000 * 1000 + (uint64_t)timeoutTimeSpec.tv_nsec;
     timeoutTimeSpec.tv_sec += nanoseconds / (1000 * 1000 * 1000);
     timeoutTimeSpec.tv_nsec = nanoseconds % (1000 * 1000 * 1000);
 
     error = pthread_cond_timedwait(&monitor->Condition, &monitor->Mutex, &timeoutTimeSpec);
+#endif
 #endif
     assert(error == 0 || error == ETIMEDOUT);
 
