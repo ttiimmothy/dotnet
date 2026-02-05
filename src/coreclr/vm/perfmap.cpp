@@ -119,7 +119,7 @@ void PerfMap::Enable(PerfMapType type, bool sendExisting)
         }
     }
 
-    if (sendExisting)
+    if (sendExisting && GetAppDomain() != nullptr)
     {
         AppDomain::AssemblyIterator assemblyIterator = GetAppDomain()->IterateAssembliesEx(
             (AssemblyIterationFlags)(kIncludeLoaded | kIncludeExecution));
