@@ -1,6 +1,7 @@
 project(Profiler)
 
 set(SOURCES
+    attachwithclientdata/attachwithclientdata.cpp
     assemblyprofiler/assemblyprofiler.cpp
     classload/classload.cpp
     dynamicjitoptimization/dynamicjitoptimization.cpp

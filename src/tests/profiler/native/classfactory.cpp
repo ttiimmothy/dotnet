@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 
 #include "classfactory.h"
+#include "attachwithclientdata/attachwithclientdata.h"
 #include "eltprofiler/slowpatheltprofiler.h"
 #include "enumthreadsprofiler/enumthreadsprofiler.h"
 #include "eventpipeprofiler/eventpipereadingprofiler.h"
@@ -168,6 +169,10 @@ HRESULT STDMETHODCALLTYPE ClassFactory::CreateInstance(IUnknown *pUnkOuter, REFI
     else if (clsid == GCSkipObjectsAllocatedByClassCallbackProfiler::GetClsid())
     {
         profiler = new GCSkipObjectsAllocatedByClassCallbackProfiler();
+    }
+    else if (clsid == AttachWithClientDataProfiler::GetClsid())
+    {
+        profiler = new AttachWithClientDataProfiler();
     }
     else
     {

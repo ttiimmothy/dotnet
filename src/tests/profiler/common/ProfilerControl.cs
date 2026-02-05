@@ -27,6 +27,13 @@ namespace Profiler.Tests
             client.AttachProfiler(TimeSpan.MaxValue, profilerGuid, profilerPath, null);
         }
 
+        public static void AttachProfilerToSelfWithClientData(Guid profilerGuid, string profilerPath, byte[] clientData)
+        {
+            int processId = Process.GetCurrentProcess().Id;
+            DiagnosticsClient client = new DiagnosticsClient(processId);
+            client.AttachProfiler(TimeSpan.MaxValue, profilerGuid, profilerPath, clientData);
+        }
+
         public static EventPipeSession AttachEventPipeSessionToSelf(IEnumerable<EventPipeProvider> providers)
         {
             int processId = Process.GetCurrentProcess().Id;
