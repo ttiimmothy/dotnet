@@ -1300,7 +1300,9 @@ namespace System.Text.RegularExpressions
                     return true;
                 }
 
-                charsConsumed = 1;
+                // The pair forms a valid supplementary code point that didn't match.
+                // Advance past both chars to keep the pair intact.
+                charsConsumed = 2;
                 return false;
             }
 

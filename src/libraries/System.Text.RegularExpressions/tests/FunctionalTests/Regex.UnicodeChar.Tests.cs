@@ -357,7 +357,7 @@ namespace System.Text.RegularExpressions.Tests
             Match match = regex.Match(input);
             Assert.True(match.Success);
             Assert.Equal(input, match.Value);
-            Assert.Equal(4, match.Length); // 2 surrogate pairs = 4 chars
+            Assert.Equal(4, match.Length); // 2 code points (surrogate pairs) = 4 UTF-16 code units
         }
 
         [Theory]
