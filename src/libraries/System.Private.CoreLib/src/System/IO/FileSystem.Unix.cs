@@ -675,7 +675,7 @@ namespace System.IO
         internal static FileSystemInfo? ResolveLinkTarget(string linkPath, bool returnFinalTarget, bool isDirectory)
         {
             ValueStringBuilder sb = new(stackalloc char[Interop.DefaultPathBufferSize]);
-            sb.Append(linkPath);
+            sb.Append(Path.GetFullPath(linkPath));
 
             string? linkTarget = Interop.Sys.ReadLink(linkPath);
             if (linkTarget == null)

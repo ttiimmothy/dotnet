@@ -67,5 +67,36 @@ namespace System.IO.Tests
             RemoteExecutor.Invoke(() => CreateSymbolicLink_PathToTarget_RelativeToLinkPath_Internal(false)).Dispose();
             RemoteExecutor.Invoke(() => CreateSymbolicLink_PathToTarget_RelativeToLinkPath_Internal(true)).Dispose();
         }
+
+        [ConditionalFact(typeof(RemoteExecutor), nameof(RemoteExecutor.IsSupported))]
+        [PlatformSpecific(TestPlatforms.AnyUnix)]
+        public void ResolveLinkTarget_RelativeLinkPathWithoutDirectoryInfo()
+        {
+            RemoteExecutor.Invoke(() =>
+            {
+                string tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+                Directory.CreateDirectory(tempDir);
+                try
+                {
+                    Directory.SetCurrentDirectory(tempDir);
+
+                    string linkName = "mylink.txt";
+                    string targetName = "mytarget.txt";
+
+                    File.CreateSymbolicLink(linkName, targetName);
+
+                    FileSystemInfo result = File.ResolveLinkTarget(linkName, returnFinalTarget: false);
+                    Assert.NotNull(result);
+
+                    string expectedFullPath = Path.Combine(tempDir, targetName);
+                    Assert.Equal(expectedFullPath, result.FullName);
+                }
+                finally
+                {
+                    Directory.SetCurrentDirectory(Path.GetTempPath());
+                    Directory.Delete(tempDir, recursive: true);
+                }
+            }).Dispose();
+        }
     }
 }
