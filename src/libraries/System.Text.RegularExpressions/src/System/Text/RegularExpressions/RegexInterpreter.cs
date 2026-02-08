@@ -849,7 +849,15 @@ namespace System.Text.RegularExpressions
                         else
                         {
                             int operand = Operand(0);
-                            if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), _code.Strings[operand], ref _code.StringsAsciiLookup[operand]))
+                            if (!_rightToLeft)
+                            {
+                                if (!RegexCharClass.CharInClass(inputSpan, runtextpos, _code.Strings[operand], ref _code.StringsAsciiLookup[operand], out int charsConsumed))
+                                {
+                                    break;
+                                }
+                                runtextpos += charsConsumed;
+                            }
+                            else if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), _code.Strings[operand], ref _code.StringsAsciiLookup[operand]))
                             {
                                 break;
                             }
@@ -941,7 +949,19 @@ namespace System.Text.RegularExpressions
 
                             while (c-- > 0)
                             {
-                                if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), set, ref setLookup))
+                                if (!_rightToLeft)
+                                {
+                                    if (!RegexCharClass.CharInClass(inputSpan, runtextpos, set, ref setLookup, out int charsConsumed))
+                                    {
+                                        goto BreakBackward;
+                                    }
+                                    runtextpos += charsConsumed;
+                                    if (charsConsumed > 1)
+                                    {
+                                        c--;
+                                    }
+                                }
+                                else if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), set, ref setLookup))
                                 {
                                     goto BreakBackward;
                                 }
@@ -1028,7 +1048,20 @@ namespace System.Text.RegularExpressions
 
                             for (i = len; i > 0; i--)
                             {
-                                if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), set, ref setLookup))
+                                if (!_rightToLeft)
+                                {
+                                    if (!RegexCharClass.CharInClass(inputSpan, runtextpos, set, ref setLookup, out int charsConsumed))
+                                    {
+                                        break;
+                                    }
+                                    runtextpos += charsConsumed;
+                                    if (charsConsumed > 1)
+                                    {
+                                        // Account for the extra char consumed by the surrogate pair.
+                                        i--;
+                                    }
+                                }
+                                else if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), set, ref setLookup))
                                 {
                                     Backwardnext();
                                     break;
@@ -1119,7 +1152,15 @@ namespace System.Text.RegularExpressions
                             runtextpos = pos;
 
                             int operand0 = Operand(0);
-                            if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), _code.Strings[operand0], ref _code.StringsAsciiLookup[operand0]))
+                            if (!_rightToLeft)
+                            {
+                                if (!RegexCharClass.CharInClass(inputSpan, runtextpos, _code.Strings[operand0], ref _code.StringsAsciiLookup[operand0], out int charsConsumed))
+                                {
+                                    break;
+                                }
+                                runtextpos += charsConsumed;
+                            }
+                            else if (!RegexCharClass.CharInClass(Forwardcharnext(inputSpan), _code.Strings[operand0], ref _code.StringsAsciiLookup[operand0]))
                             {
                                 break;
                             }

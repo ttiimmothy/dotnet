@@ -674,7 +674,7 @@ namespace System.Text.RegularExpressions
                             ref uint[]? startingAsciiLookup = ref _asciiLookups![0];
                             for (int i = 0; i < span.Length; i++)
                             {
-                                if (RegexCharClass.CharInClass(span[i], primarySet.Set, ref startingAsciiLookup))
+                                if (RegexCharClass.CharInClass(span, i, primarySet.Set, ref startingAsciiLookup, out _))
                                 {
                                     pos += i;
                                     return true;

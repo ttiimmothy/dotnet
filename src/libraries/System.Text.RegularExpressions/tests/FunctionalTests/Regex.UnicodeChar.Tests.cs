@@ -302,5 +302,97 @@ namespace System.Text.RegularExpressions.Tests
             var match2 = match1.NextMatch();
             Assert.False(match2.Success);
         }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_MatchesUnicodeCategory_Lo(RegexEngine engine)
+        {
+            // U+26552 (𦕒) is a CJK Unified Ideograph Extension B, category OtherLetter (Lo)
+            string input = "\U00026552";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{Lo}+");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_MatchesUnicodeCategory_L(RegexEngine engine)
+        {
+            // U+26552 (𦕒) is a CJK Unified Ideograph Extension B, broad category Letter (L)
+            string input = "\U00026552";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{L}+");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_MatchesUnicodeCategory_Nd(RegexEngine engine)
+        {
+            // U+1D7CE (𝟎) is a Mathematical Monospace Digit Zero, category DecimalDigitNumber (Nd)
+            string input = "\U0001D7CE";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{Nd}+");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_MultipleSurrogatePairsInInput(RegexEngine engine)
+        {
+            // Multiple supplementary plane characters: U+26552 (Lo) + U+20000 (Lo)
+            string input = "\U00026552\U00020000";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{Lo}+");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+            Assert.Equal(4, match.Length); // 2 surrogate pairs = 4 chars
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_MixedBmpAndSupplementary(RegexEngine engine)
+        {
+            // Mix BMP 'A' (Lu) with supplementary U+26552 (Lo) - both in \p{L}
+            string input = "A\U00026552B";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{L}+");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task IsolatedSurrogate_MatchesCs(RegexEngine engine)
+        {
+            // An isolated high surrogate should still match \p{Cs}
+            string input = "\uD800";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"\p{Cs}");
+
+            Match match = regex.Match(input);
+            Assert.True(match.Success);
+            Assert.Equal(input, match.Value);
+        }
+
+        [Theory]
+        [InlineData(RegexEngine.Interpreter)]
+        public async Task SurrogatePair_DoesNotMatchCs(RegexEngine engine)
+        {
+            // A properly paired surrogate forming U+26552 (Lo) should not match \p{Cs}
+            // because the pair is recognized as a single code point
+            string input = "\U00026552";
+            Regex regex = await RegexHelpers.GetRegexAsync(engine, @"^\p{Cs}+$");
+
+            Match match = regex.Match(input);
+            Assert.False(match.Success);
+        }
     }
 }

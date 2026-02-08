@@ -1271,6 +1271,125 @@ namespace System.Text.RegularExpressions
         public static bool CharInClass(char ch, string set) =>
             CharInClassRecursive(ch, set, 0);
 
+#if NET
+        /// <summary>
+        /// Determines whether a character (or surrogate pair) at the specified index in the input matches a character class.
+        /// When a surrogate pair is detected, the full code point is used for Unicode category lookups.
+        /// </summary>
+        /// <param name="inputSpan">The input text.</param>
+        /// <param name="index">The index of the character to test.</param>
+        /// <param name="set">The string representation of the character class.</param>
+        /// <param name="asciiLazyCache">A lazily-populated cache for ASCII results.</param>
+        /// <param name="charsConsumed">Outputs the number of chars consumed (2 for a surrogate pair, 1 otherwise).</param>
+        /// <returns>true if the character or surrogate pair matches the character class.</returns>
+        public static bool CharInClass(ReadOnlySpan<char> inputSpan, int index, string set, ref uint[]? asciiLazyCache, out int charsConsumed)
+        {
+            char ch = inputSpan[index];
+
+            // Check for a surrogate pair: high surrogate followed by low surrogate.
+            if (char.IsHighSurrogate(ch) && (uint)(index + 1) < (uint)inputSpan.Length && char.IsLowSurrogate(inputSpan[index + 1]))
+            {
+                // We have a surrogate pair. Try matching the full code point first, since
+                // the pair represents a single logical character. This ensures that e.g.
+                // \p{Lo} matches CJK Extension B characters, and \p{Cs} does NOT match
+                // properly paired surrogates.
+                int codePoint = char.ConvertToUtf32(ch, inputSpan[index + 1]);
+                if (CharInClassForCodePoint(codePoint, set))
+                {
+                    charsConsumed = 2;
+                    return true;
+                }
+
+                charsConsumed = 1;
+                return false;
+            }
+
+            charsConsumed = 1;
+            return CharInClass(ch, set, ref asciiLazyCache);
+        }
+
+        /// <summary>
+        /// Checks whether a supplementary code point matches the category portion of a character class.
+        /// This only checks categories (e.g. \p{Lo}), not character ranges, since supplementary
+        /// code points cannot be represented in the char-based range format.
+        /// </summary>
+        private static bool CharInClassForCodePoint(int codePoint, string set) =>
+            CharInClassForCodePointRecursive(codePoint, set, 0);
+
+        private static bool CharInClassForCodePointRecursive(int codePoint, string set, int start)
+        {
+            int setLength = set[start + SetLengthIndex];
+            int categoryLength = set[start + CategoryLengthIndex];
+            int endPosition = start + SetStartIndex + setLength + categoryLength;
+
+            bool inClass = false;
+
+            // Only check categories for supplementary code points (ranges use char values and can't represent them).
+            if (categoryLength > 0)
+            {
+                inClass = CharInCategoryCodePoint(codePoint, set.AsSpan(SetStartIndex + start + setLength, categoryLength));
+            }
+
+            if (IsNegated(set, start))
+            {
+                inClass = !inClass;
+            }
+
+            if (inClass && set.Length > endPosition)
+            {
+                inClass = !CharInClassForCodePointRecursive(codePoint, set, endPosition);
+            }
+
+            return inClass;
+        }
+
+        /// <summary>
+        /// Checks whether a supplementary code point belongs to any of the Unicode categories in the category set.
+        /// </summary>
+        private static bool CharInCategoryCodePoint(int codePoint, ReadOnlySpan<char> categorySetSegment)
+        {
+            UnicodeCategory chcategory = CharUnicodeInfo.GetUnicodeCategory(codePoint);
+
+            for (int i = 0; i < categorySetSegment.Length; i++)
+            {
+                int curcat = (short)categorySetSegment[i];
+
+                if (curcat == 0)
+                {
+                    if (CharInCategoryGroup(chcategory, categorySetSegment, ref i))
+                    {
+                        return true;
+                    }
+                }
+                else if (curcat > 0)
+                {
+                    if (curcat == SpaceConst)
+                    {
+                        // Supplementary code points are not whitespace.
+                    }
+                    else if (chcategory == (UnicodeCategory)(curcat - 1))
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    if (curcat == NotSpaceConst)
+                    {
+                        // Supplementary code points are not whitespace, so they match \S.
+                        return true;
+                    }
+                    else if (chcategory != (UnicodeCategory)(-1 - curcat))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+#endif
+
         private static bool CharInClassRecursive(char ch, string set, int start)
         {
             int setLength = set[start + SetLengthIndex];
