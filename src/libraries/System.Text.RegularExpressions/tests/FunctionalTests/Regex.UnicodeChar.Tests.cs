@@ -41,6 +41,10 @@ namespace System.Text.RegularExpressions.Tests
                     case UnicodeCategory.ConnectorPunctuation:   // Pc
                         validChars.Add(c);
                         break;
+                    case UnicodeCategory.Surrogate:
+                        // Skip surrogates: adjacent surrogates could form valid supplementary
+                        // code points that match \w when surrogate pair handling is active.
+                        break;
                     default:
                         invalidChars.Add(c);
                         break;
